@@ -1,0 +1,54 @@
+name: Monitor planu ZSTiB
+
+on:
+  schedule:
+    # GitHub Actions obsługuje harmonogram od co najmniej 5 minut.
+    - cron: "*/5 * * * *"
+
+  # Pozwala też uruchomić monitor ręcznie z zakładki Actions.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zstib-plan-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Ustaw Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Zainstaluj zależności
+        run: pip install -r requirements.txt
+
+      - name: Sprawdź plan
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python monitor.py
+
+      # state.json przechowuje ostatnio widzianą wersję planu.
+      # Jeśli monitor ją zmieni, zapisujemy ją z powrotem w repo.
+      - name: Zapisz nowy stan
+        run: |
+          if git diff --quiet -- state.json && git diff --cached --quiet; then
+            echo "Stan bez zmian."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add state.json
+          git commit -m "chore: update plan monitor state"
+          git push
