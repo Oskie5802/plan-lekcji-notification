@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 URL = "https://zstib.edu.pl/plan-lekcji"
 STATE_FILE = Path("state.json")
 WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "").strip()
+TEST_NOTIFICATION = os.environ.get("TEST_NOTIFICATION", "false").lower() == "true"
 
 HEADERS = {
     "User-Agent": (
@@ -90,6 +91,25 @@ def send_discord(old_state, new_state):
 
 
 def main():
+    if TEST_NOTIFICATION:
+        if not WEBHOOK:
+            print("Brak DISCORD_WEBHOOK - nie mogę wysłać testu.", file=sys.stderr)
+            sys.exit(1)
+
+        payload = {
+            "username": "ZSTiB Plan Monitor",
+            "content": (
+                "✅ **Test monitora ZSTiB działa!**\n"
+                "Jeśli widzisz tę wiadomość, Discord webhook i GitHub Actions są poprawnie skonfigurowane.\n"
+                f"🔗 {URL}"
+            ),
+        }
+
+        response = requests.post(WEBHOOK, json=payload, timeout=30)
+        response.raise_for_status()
+        print("Testowe powiadomienie wysłane.")
+        return
+
     try:
         new_state = fetch_plan()
     except Exception as exc:
