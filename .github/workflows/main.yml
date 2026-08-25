@@ -2,11 +2,15 @@ name: Monitor planu ZSTiB
 
 on:
   schedule:
-    # GitHub Actions obsługuje harmonogram od co najmniej 5 minut.
     - cron: "*/5 * * * *"
 
-  # Pozwala też uruchomić monitor ręcznie z zakładki Actions.
   workflow_dispatch:
+    inputs:
+      send_test:
+        description: "Wyślij testowe powiadomienie na Discord"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -32,14 +36,14 @@ jobs:
       - name: Zainstaluj zależności
         run: pip install -r requirements.txt
 
-      - name: Sprawdź plan
+      - name: Sprawdź plan / wyślij test
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TEST_NOTIFICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.send_test || false }}
         run: python monitor.py
 
-      # state.json przechowuje ostatnio widzianą wersję planu.
-      # Jeśli monitor ją zmieni, zapisujemy ją z powrotem w repo.
       - name: Zapisz nowy stan
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.send_test) }}
         run: |
           if git diff --quiet -- state.json && git diff --cached --quiet; then
             echo "Stan bez zmian."
